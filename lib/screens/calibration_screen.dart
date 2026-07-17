@@ -68,7 +68,7 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
                   padding: EdgeInsets.symmetric(horizontal: 40.0),
                   child: Text(
                     "Stare at each red dot continuously and blink 3 times, or dwell your gaze on it for 3 seconds to register coordinate mapping.",
-                    style: TextStyle(color: Colors.white64, fontSize: 13),
+                    style: TextStyle(color: Colors.white70, fontSize: 13),
                     textAlign: TextAlign.center,
                   ),
                 ),
