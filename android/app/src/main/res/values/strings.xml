@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="app_name">Hands-Free Controller</string>
-    <string name="accessibility_service_label">Hands-Free Accessibility Controller</string>
-    <string name="accessibility_service_description">Hands-Free Phone Controller Accessibility Service enables eye tracking, voice commands, text commands and system-wide phone control.</string>
-</resources>
