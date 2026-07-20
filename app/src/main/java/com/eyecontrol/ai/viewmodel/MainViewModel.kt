@@ -147,8 +147,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun detectFrame(imageProxy: ImageProxy) {
-        if (_isDetecting.value) {
-            faceLandmarkerHelper?.detectLiveStream(imageProxy)
+        val helper = faceLandmarkerHelper
+        if (_isDetecting.value && helper != null) {
+            helper.detectLiveStream(imageProxy)
         } else {
             imageProxy.close()
         }

@@ -74,11 +74,12 @@ fun HomeScreen(navController: NavController, viewModel: MainViewModel) {
         voiceLanguage = voiceLangState
     }
 
-    val speechRecognizer = remember { SpeechRecognizer.createSpeechRecognizer(context) }
+    val speechRecognizer = remember { SpeechRecognizer.createSpeechRecognizer(context.applicationContext) }
     val recognizerIntent = remember(voiceLanguage) {
         Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, voiceLanguage)
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
         }
     }
 
@@ -97,7 +98,12 @@ fun HomeScreen(navController: NavController, viewModel: MainViewModel) {
                 }
                 isListening = false
             }
-            override fun onPartialResults(partialResults: Bundle?) {}
+            override fun onPartialResults(partialResults: Bundle?) {
+                val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                if (!matches.isNullOrEmpty()) {
+                    spokenText = matches[0]
+                }
+            }
             override fun onEvent(eventType: Int, params: Bundle?) {}
         }
         speechRecognizer.setRecognitionListener(listener)
@@ -413,24 +419,14 @@ fun HomeScreen(navController: NavController, viewModel: MainViewModel) {
                 ) {
                     Text("Voice Typing (Speech Recognition)", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     
-                    Box(
+                    OutlinedTextField(
+                        value = spokenText,
+                        onValueChange = { spokenText = it },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(100.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(MaterialTheme.colorScheme.surface)
-                            .padding(8.dp)
-                    ) {
-                        if (spokenText.isEmpty()) {
-                            Text(
-                                "Spoken text will appear here...",
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                                fontSize = 14.sp
-                            )
-                        } else {
-                            Text(spokenText, color = MaterialTheme.colorScheme.onSurface, fontSize = 14.sp)
-                        }
-                    }
+                            .height(120.dp),
+                        placeholder = { Text("Spoken text will appear here...") }
+                    )
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
