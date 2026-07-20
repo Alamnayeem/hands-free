@@ -34,22 +34,8 @@ class FaceLandmarkerHelper(
 
     private fun setupFaceLandmarker() {
         try {
-            val modelFile = File(context.filesDir, "face_landmarker.task")
-            if (!modelFile.exists()) {
-                listener.onError("Downloading face model. Please wait...")
-                val success = ModelDownloader.downloadModel(
-                    context,
-                    "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
-                    modelFile
-                )
-                if (!success) {
-                    listener.onError("Failed to download model file.")
-                    return
-                }
-            }
-
             val baseOptionsBuilder = BaseOptions.builder()
-                .setModelFile(modelFile)
+                .setModelAssetPath("face_landmarker.task")
 
             val optionsBuilder = FaceLandmarker.FaceLandmarkerOptions.builder()
                 .setBaseOptions(baseOptionsBuilder.build())
