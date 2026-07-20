@@ -21,11 +21,14 @@ class FaceLandmarkerHelper(
 ) {
     interface LandmarkerListener {
         fun onError(error: String)
-        fun onResults(result: FaceLandmarkerResult, inputImageWidth: Int, inputImageHeight: Int)
+        fun onResults(result: FaceLandmarkerResult, inputImageWidth: Int, inputImageHeight: Int, rotationDegrees: Int)
     }
 
     private var faceLandmarker: FaceLandmarker? = null
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
+
+    @Volatile
+    private var lastRotationDegrees = 0
 
     init {
         executor.execute {
@@ -45,7 +48,7 @@ class FaceLandmarkerHelper(
                 .setMinFacePresenceConfidence(0.5f)
                 .setRunningMode(RunningMode.LIVE_STREAM)
                 .setResultListener { result, inputImage ->
-                    listener.onResults(result, inputImage.width, inputImage.height)
+                    listener.onResults(result, inputImage.width, inputImage.height, lastRotationDegrees)
                 }
                 .setErrorListener { error ->
                     listener.onError(error.message ?: "Unknown MediaPipe error")
@@ -64,6 +67,7 @@ class FaceLandmarkerHelper(
         }
 
         val rotationDegrees = imageProxy.imageInfo.rotationDegrees
+        lastRotationDegrees = rotationDegrees
         val bitmap = try {
             imageProxy.toBitmap()
         } catch (e: Exception) {

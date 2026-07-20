@@ -42,6 +42,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _allFaceLandmarks = MutableStateFlow<List<PointF>>(emptyList())
     val allFaceLandmarks: StateFlow<List<PointF>> = _allFaceLandmarks.asStateFlow()
 
+    private val _imageWidth = MutableStateFlow(0)
+    val imageWidth: StateFlow<Int> = _imageWidth.asStateFlow()
+
+    private val _imageHeight = MutableStateFlow(0)
+    val imageHeight: StateFlow<Int> = _imageHeight.asStateFlow()
+
+    private val _rotationDegrees = MutableStateFlow(0)
+    val rotationDegrees: StateFlow<Int> = _rotationDegrees.asStateFlow()
+
     fun setDarkTheme(enabled: Boolean) {
         viewModelScope.launch {
             repository.setDarkTheme(enabled)
@@ -85,8 +94,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     override fun onResults(
                         result: FaceLandmarkerResult,
                         inputImageWidth: Int,
-                        inputImageHeight: Int
+                        inputImageHeight: Int,
+                        rotationDegrees: Int
                     ) {
+                        _imageWidth.value = inputImageWidth
+                        _imageHeight.value = inputImageHeight
+                        _rotationDegrees.value = rotationDegrees
+
                         val landmarks = result.faceLandmarks()
                         if (landmarks.isNullOrEmpty()) {
                             _detectionStatus.value = "No face detected"
@@ -140,6 +154,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _leftEyeLandmarks.value = emptyList()
         _rightEyeLandmarks.value = emptyList()
         _allFaceLandmarks.value = emptyList()
+        _imageWidth.value = 0
+        _imageHeight.value = 0
+        _rotationDegrees.value = 0
         _fps.value = 0
         
         faceLandmarkerHelper?.close()

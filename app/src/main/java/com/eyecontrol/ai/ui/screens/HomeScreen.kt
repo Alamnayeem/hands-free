@@ -181,6 +181,9 @@ fun HomeScreen(navController: NavController, viewModel: MainViewModel) {
                             val isDetecting by viewModel.isDetecting.collectAsState()
                             val detectionStatus by viewModel.detectionStatus.collectAsState()
                             val fpsVal by viewModel.fps.collectAsState()
+                            val imageWidth by viewModel.imageWidth.collectAsState()
+                            val imageHeight by viewModel.imageHeight.collectAsState()
+                            val rotationDegrees by viewModel.rotationDegrees.collectAsState()
 
                             AndroidView(
                                 factory = { ctx ->
@@ -225,38 +228,84 @@ fun HomeScreen(navController: NavController, viewModel: MainViewModel) {
                                     val width = size.width
                                     val height = size.height
 
-                                    // Draw face mesh landmarks in semi-transparent white
-                                    allFacePoints.forEach { point ->
-                                        // Mirror horizontally because front camera is mirrored in preview
-                                        val drawX = (1f - point.x) * width
-                                        val drawY = point.y * height
-                                        drawCircle(
-                                            color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.4f),
-                                            radius = 1.5.dp.toPx(),
-                                            center = androidx.compose.ui.geometry.Offset(drawX, drawY)
-                                        )
-                                    }
+                                    if (imageWidth > 0 && imageHeight > 0) {
+                                        val isRotated = rotationDegrees == 90 || rotationDegrees == 270
+                                        val rotatedWidth = if (isRotated) imageHeight else imageWidth
+                                        val rotatedHeight = if (isRotated) imageWidth else imageHeight
 
-                                    // Draw Left Eye landmarks in glowing Cyan
-                                    leftEyePoints.forEach { point ->
-                                        val drawX = (1f - point.x) * width
-                                        val drawY = point.y * height
-                                        drawCircle(
-                                            color = androidx.compose.ui.graphics.Color.Cyan,
-                                            radius = 3.dp.toPx(),
-                                            center = androidx.compose.ui.geometry.Offset(drawX, drawY)
-                                        )
-                                    }
+                                        val scaleFactor = if (width / rotatedWidth > height / rotatedHeight) width / rotatedWidth else height / rotatedHeight
+                                        val scaledWidth = rotatedWidth * scaleFactor
+                                        val scaledHeight = rotatedHeight * scaleFactor
 
-                                    // Draw Right Eye landmarks in glowing Yellow
-                                    rightEyePoints.forEach { point ->
-                                        val drawX = (1f - point.x) * width
-                                        val drawY = point.y * height
-                                        drawCircle(
-                                            color = androidx.compose.ui.graphics.Color.Yellow,
-                                            radius = 3.dp.toPx(),
-                                            center = androidx.compose.ui.geometry.Offset(drawX, drawY)
-                                        )
+                                        val xOffset = (width - scaledWidth) / 2f
+                                        val yOffset = (height - scaledHeight) / 2f
+
+                                        // Draw face mesh landmarks in semi-transparent white
+                                        allFacePoints.forEach { point ->
+                                            val drawX = width - (point.x * scaledWidth + xOffset)
+                                            val drawY = point.y * scaledHeight + yOffset
+                                            drawCircle(
+                                                color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.4f),
+                                                radius = 1.5.dp.toPx(),
+                                                center = androidx.compose.ui.geometry.Offset(drawX, drawY)
+                                            )
+                                        }
+
+                                        // Draw Left Eye landmarks in glowing Cyan
+                                        leftEyePoints.forEach { point ->
+                                            val drawX = width - (point.x * scaledWidth + xOffset)
+                                            val drawY = point.y * scaledHeight + yOffset
+                                            drawCircle(
+                                                color = androidx.compose.ui.graphics.Color.Cyan,
+                                                radius = 3.dp.toPx(),
+                                                center = androidx.compose.ui.geometry.Offset(drawX, drawY)
+                                            )
+                                        }
+
+                                        // Draw Right Eye landmarks in glowing Yellow
+                                        rightEyePoints.forEach { point ->
+                                            val drawX = width - (point.x * scaledWidth + xOffset)
+                                            val drawY = point.y * scaledHeight + yOffset
+                                            drawCircle(
+                                                color = androidx.compose.ui.graphics.Color.Yellow,
+                                                radius = 3.dp.toPx(),
+                                                center = androidx.compose.ui.geometry.Offset(drawX, drawY)
+                                            )
+                                        }
+                                    } else {
+                                        // Fallback layout if dimensions are not yet received
+                                        allFacePoints.forEach { point ->
+                                            // Mirror horizontally because front camera is mirrored in preview
+                                            val drawX = (1f - point.x) * width
+                                            val drawY = point.y * height
+                                            drawCircle(
+                                                color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.4f),
+                                                radius = 1.5.dp.toPx(),
+                                                center = androidx.compose.ui.geometry.Offset(drawX, drawY)
+                                            )
+                                        }
+
+                                        // Draw Left Eye landmarks in glowing Cyan
+                                        leftEyePoints.forEach { point ->
+                                            val drawX = (1f - point.x) * width
+                                            val drawY = point.y * height
+                                            drawCircle(
+                                                color = androidx.compose.ui.graphics.Color.Cyan,
+                                                radius = 3.dp.toPx(),
+                                                center = androidx.compose.ui.geometry.Offset(drawX, drawY)
+                                            )
+                                        }
+
+                                        // Draw Right Eye landmarks in glowing Yellow
+                                        rightEyePoints.forEach { point ->
+                                            val drawX = (1f - point.x) * width
+                                            val drawY = point.y * height
+                                            drawCircle(
+                                                color = androidx.compose.ui.graphics.Color.Yellow,
+                                                radius = 3.dp.toPx(),
+                                                center = androidx.compose.ui.geometry.Offset(drawX, drawY)
+                                            )
+                                        }
                                     }
                                 }
                             }
