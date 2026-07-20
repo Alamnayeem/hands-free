@@ -1,10 +1,11 @@
 package com.eyecontrol.ai.helper
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.os.SystemClock
 import android.util.Log
 import androidx.camera.core.ImageProxy
-import com.google.mediapipe.framework.image.MediaImageBuilder
+import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.tasks.core.BaseOptions
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.core.ImageProcessingOptions
@@ -62,22 +63,31 @@ class FaceLandmarkerHelper(
             return
         }
 
+        val rotationDegrees = imageProxy.imageInfo.rotationDegrees
+        val bitmap = try {
+            imageProxy.toBitmap()
+        } catch (e: Exception) {
+            Log.e("FaceLandmarkerHelper", "Error converting ImageProxy to Bitmap: ${e.message}")
+            null
+        } finally {
+            imageProxy.close()
+        }
+
+        if (bitmap == null) {
+            return
+        }
+
         executor.execute {
             try {
-                val image = imageProxy.image
-                if (image != null) {
-                    val mpImage = MediaImageBuilder(image).build()
-                    val imageProcessingOptions = ImageProcessingOptions.builder()
-                        .setRotationDegrees(imageProxy.imageInfo.rotationDegrees)
-                        .build()
-                    
-                    val frameTime = SystemClock.uptimeMillis()
-                    faceLandmarker?.detectAsync(mpImage, imageProcessingOptions, frameTime)
-                }
+                val mpImage = BitmapImageBuilder(bitmap).build()
+                val imageProcessingOptions = ImageProcessingOptions.builder()
+                    .setRotationDegrees(rotationDegrees)
+                    .build()
+                
+                val frameTime = SystemClock.uptimeMillis()
+                faceLandmarker?.detectAsync(mpImage, imageProcessingOptions, frameTime)
             } catch (e: Exception) {
                 Log.e("FaceLandmarkerHelper", "Error processing image: ${e.message}")
-            } finally {
-                imageProxy.close()
             }
         }
     }
