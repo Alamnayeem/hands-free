@@ -49,7 +49,7 @@ class FaceLandmarkerHelper(
             }
 
             val baseOptionsBuilder = BaseOptions.builder()
-                .setModelFilePath(modelFile.absolutePath)
+                .setModelFile(modelFile)
 
             val optionsBuilder = FaceLandmarker.FaceLandmarkerOptions.builder()
                 .setBaseOptions(baseOptionsBuilder.build())

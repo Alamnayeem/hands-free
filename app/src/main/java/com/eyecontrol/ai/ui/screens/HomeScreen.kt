@@ -392,7 +392,7 @@ fun HomeScreen(navController: NavController, viewModel: MainViewModel) {
                                     ),
                                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                                 ) {
-                                    Icon(Icons.Default.Stop, contentDescription = "Stop", modifier = Modifier.size(16.dp))
+                                    Icon(Icons.Default.Close, contentDescription = "Stop", modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text("Stop", fontSize = 12.sp)
                                 }
