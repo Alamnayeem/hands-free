@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.provider.Settings
+import android.net.Uri
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -242,7 +243,7 @@ fun HomeScreen(navController: NavController, viewModel: MainViewModel) {
 
                                         // Draw face mesh landmarks in semi-transparent white
                                         allFacePoints.forEach { point ->
-                                            val drawX = width - (point.x * scaledWidth + xOffset)
+                                            val drawX = point.x * scaledWidth + xOffset
                                             val drawY = point.y * scaledHeight + yOffset
                                             drawCircle(
                                                 color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.4f),
@@ -253,7 +254,7 @@ fun HomeScreen(navController: NavController, viewModel: MainViewModel) {
 
                                         // Draw Left Eye landmarks in glowing Cyan
                                         leftEyePoints.forEach { point ->
-                                            val drawX = width - (point.x * scaledWidth + xOffset)
+                                            val drawX = point.x * scaledWidth + xOffset
                                             val drawY = point.y * scaledHeight + yOffset
                                             drawCircle(
                                                 color = androidx.compose.ui.graphics.Color.Cyan,
@@ -264,7 +265,7 @@ fun HomeScreen(navController: NavController, viewModel: MainViewModel) {
 
                                         // Draw Right Eye landmarks in glowing Yellow
                                         rightEyePoints.forEach { point ->
-                                            val drawX = width - (point.x * scaledWidth + xOffset)
+                                            val drawX = point.x * scaledWidth + xOffset
                                             val drawY = point.y * scaledHeight + yOffset
                                             drawCircle(
                                                 color = androidx.compose.ui.graphics.Color.Yellow,
@@ -275,8 +276,7 @@ fun HomeScreen(navController: NavController, viewModel: MainViewModel) {
                                     } else {
                                         // Fallback layout if dimensions are not yet received
                                         allFacePoints.forEach { point ->
-                                            // Mirror horizontally because front camera is mirrored in preview
-                                            val drawX = (1f - point.x) * width
+                                            val drawX = point.x * width
                                             val drawY = point.y * height
                                             drawCircle(
                                                 color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.4f),
@@ -287,7 +287,7 @@ fun HomeScreen(navController: NavController, viewModel: MainViewModel) {
 
                                         // Draw Left Eye landmarks in glowing Cyan
                                         leftEyePoints.forEach { point ->
-                                            val drawX = (1f - point.x) * width
+                                            val drawX = point.x * width
                                             val drawY = point.y * height
                                             drawCircle(
                                                 color = androidx.compose.ui.graphics.Color.Cyan,
@@ -298,7 +298,7 @@ fun HomeScreen(navController: NavController, viewModel: MainViewModel) {
 
                                         // Draw Right Eye landmarks in glowing Yellow
                                         rightEyePoints.forEach { point ->
-                                            val drawX = (1f - point.x) * width
+                                            val drawX = point.x * width
                                             val drawY = point.y * height
                                             drawCircle(
                                                 color = androidx.compose.ui.graphics.Color.Yellow,
@@ -453,6 +453,69 @@ fun HomeScreen(navController: NavController, viewModel: MainViewModel) {
                                 }
                             }
                         }
+                    }
+                }
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                val eyeTrackingActive by viewModel.eyeTrackingActiveFlow.collectAsState(initial = false)
+                val isCalibrated by viewModel.isCalibratedFlow.collectAsState(initial = false)
+                val context = LocalContext.current
+                val hasOverlayPermission = remember { Settings.canDrawOverlays(context) }
+
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("Eye Cursor Engine", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            Text(
+                                if (eyeTrackingActive) "Active overlay cursor running" else "Offline",
+                                color = if (eyeTrackingActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        Switch(
+                            checked = eyeTrackingActive,
+                            onCheckedChange = { active ->
+                                if (active && !Settings.canDrawOverlays(context)) {
+                                    val intent = Intent(
+                                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                        Uri.parse("package:${context.packageName}")
+                                    )
+                                    context.startActivity(intent)
+                                } else {
+                                    viewModel.setEyeTrackingActive(active)
+                                }
+                            }
+                        )
+                    }
+
+                    if (!hasOverlayPermission) {
+                        Text(
+                            "⚠️ Overlay (Draw over other apps) permission is required to render the floating cursor. Please enable it.",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.error,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    if (eyeTrackingActive && !isCalibrated) {
+                        Text(
+                            "💡 Engine is running, but you have not calibrated your gaze yet! Go to Settings -> Calibrate Gaze for accurate tracking.",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
                 }
             }

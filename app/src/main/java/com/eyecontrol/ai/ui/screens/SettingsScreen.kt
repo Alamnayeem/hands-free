@@ -7,12 +7,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
 import androidx.navigation.NavController
 import com.eyecontrol.ai.viewmodel.MainViewModel
 
@@ -22,6 +24,11 @@ fun SettingsScreen(navController: NavController, viewModel: MainViewModel) {
     val darkTheme by viewModel.darkThemeFlow.collectAsState(initial = false)
     val cameraSelection by viewModel.cameraSelectionFlow.collectAsState(initial = "Front")
     val voiceLanguage by viewModel.voiceLanguageFlow.collectAsState(initial = "en-US")
+
+    val cursorSpeed by viewModel.cursorSpeedFlow.collectAsState(initial = 1.0f)
+    val cursorSmoothing by viewModel.cursorSmoothingFlow.collectAsState(initial = 0.5f)
+    val cursorSize by viewModel.cursorSizeFlow.collectAsState(initial = 40)
+    val isCalibrated by viewModel.isCalibratedFlow.collectAsState(initial = false)
 
     var showCameraDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
@@ -46,10 +53,13 @@ fun SettingsScreen(navController: NavController, viewModel: MainViewModel) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Section: General Settings
+            Text("General Settings", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, fontSize = 14.sp)
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp),
+                    .padding(vertical = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -69,7 +79,7 @@ fun SettingsScreen(navController: NavController, viewModel: MainViewModel) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { showCameraDialog = true }
-                    .padding(vertical = 8.dp),
+                    .padding(vertical = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -85,13 +95,114 @@ fun SettingsScreen(navController: NavController, viewModel: MainViewModel) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { showLanguageDialog = true }
-                    .padding(vertical = 8.dp),
+                    .padding(vertical = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
                     Text("Voice Typing Language", fontSize = 16.sp)
                     Text("Current: $voiceLanguage", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+
+            HorizontalDivider()
+
+            // Section: Eye Cursor Engine
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Eye Cursor Engine", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, fontSize = 14.sp)
+
+            // Cursor Speed
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Cursor Speed", fontSize = 16.sp)
+                    Text(String.format("%.1fx", cursorSpeed), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                }
+                Slider(
+                    value = cursorSpeed,
+                    onValueChange = { viewModel.setCursorSpeed(it) },
+                    valueRange = 0.1f..5.0f,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            HorizontalDivider()
+
+            // Cursor Smoothing
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Jitter Smoothing (EMA)", fontSize = 16.sp)
+                    Text(String.format("%.2f", cursorSmoothing), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                }
+                Slider(
+                    value = cursorSmoothing,
+                    onValueChange = { viewModel.setCursorSmoothing(it) },
+                    valueRange = 0.0f..0.99f,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            HorizontalDivider()
+
+            // Cursor Size
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Cursor Size", fontSize = 16.sp)
+                    Text("${cursorSize}dp", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                }
+                Slider(
+                    value = cursorSize.toFloat(),
+                    onValueChange = { viewModel.setCursorSize(it.toInt()) },
+                    valueRange = 20f..100f,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            HorizontalDivider()
+
+            // Calibration Info & Controls
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Calibration Status", fontSize = 16.sp)
+                    SuggestionChip(
+                        onClick = {},
+                        label = { Text(if (isCalibrated) "Calibrated" else "Not Calibrated") },
+                        colors = SuggestionChipDefaults.suggestionChipColors(
+                            labelColor = if (isCalibrated) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                        )
+                    )
+                }
+
+                Button(
+                    onClick = { navController.navigate("calibration") },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(if (isCalibrated) "Recalibrate Gaze" else "Start Gaze Calibration")
+                }
+
+                if (isCalibrated) {
+                    OutlinedButton(
+                        onClick = { viewModel.clearCalibration() },
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Reset Calibration Data")
+                    }
                 }
             }
 

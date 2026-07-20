@@ -103,4 +103,27 @@ class FaceLandmarkerHelper(
         }
         executor.shutdown()
     }
+
+    companion object {
+        fun transformLandmark(x: Float, y: Float, rotationDegrees: Int, isFrontCamera: Boolean): android.graphics.PointF {
+            // 1. Rotate based on rotationDegrees (the rotation applied by CameraX/MediaPipe to make image upright)
+            val rotatedX = when (rotationDegrees) {
+                90 -> 1f - y
+                180 -> 1f - x
+                270 -> y
+                else -> x
+            }
+            val rotatedY = when (rotationDegrees) {
+                90 -> x
+                180 -> 1f - y
+                270 -> 1f - x
+                else -> y
+            }
+            
+            // 2. Mirror horizontally if front camera (mirroring is done horizontally in portrait coordinate space)
+            val finalX = if (isFrontCamera) 1f - rotatedX else rotatedX
+            
+            return android.graphics.PointF(finalX, rotatedY)
+        }
+    }
 }

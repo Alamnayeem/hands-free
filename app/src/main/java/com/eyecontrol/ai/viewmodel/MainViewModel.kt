@@ -22,6 +22,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val cameraSelectionFlow: Flow<String> = repository.cameraSelectionFlow
     val voiceLanguageFlow: Flow<String> = repository.voiceLanguageFlow
 
+    val cursorSpeedFlow: Flow<Float> = repository.cursorSpeedFlow
+    val cursorSmoothingFlow: Flow<Float> = repository.cursorSmoothingFlow
+    val cursorSizeFlow: Flow<Int> = repository.cursorSizeFlow
+    val eyeTrackingActiveFlow: Flow<Boolean> = repository.eyeTrackingActiveFlow
+    val isCalibratedFlow: Flow<Boolean> = repository.isCalibratedFlow
+    val calibrationDataFlow: Flow<SettingsRepository.CalibrationData> = repository.calibrationDataFlow
+
     private var faceLandmarkerHelper: FaceLandmarkerHelper? = null
 
     private val _isDetecting = MutableStateFlow(false)
@@ -66,6 +73,54 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setVoiceLanguage(language: String) {
         viewModelScope.launch {
             repository.setVoiceLanguage(language)
+        }
+    }
+
+    fun setCursorSpeed(speed: Float) {
+        viewModelScope.launch {
+            repository.setCursorSpeed(speed)
+        }
+    }
+
+    fun setCursorSmoothing(smoothing: Float) {
+        viewModelScope.launch {
+            repository.setCursorSmoothing(smoothing)
+        }
+    }
+
+    fun setCursorSize(size: Int) {
+        viewModelScope.launch {
+            repository.setCursorSize(size)
+        }
+    }
+
+    fun setEyeTrackingActive(active: Boolean) {
+        viewModelScope.launch {
+            repository.setEyeTrackingActive(active)
+        }
+    }
+
+    fun saveCalibration(
+        centerX: Float, centerY: Float,
+        leftX: Float, leftY: Float,
+        rightX: Float, rightY: Float,
+        upX: Float, upY: Float,
+        downX: Float, downY: Float
+    ) {
+        viewModelScope.launch {
+            repository.saveCalibration(
+                centerX, centerY,
+                leftX, leftY,
+                rightX, rightY,
+                upX, upY,
+                downX, downY
+            )
+        }
+    }
+
+    fun clearCalibration() {
+        viewModelScope.launch {
+            repository.clearCalibration()
         }
     }
 
@@ -114,20 +169,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             val leftEyeIndices = listOf(33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246)
                             val rightEyeIndices = listOf(362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387, 386, 385, 384, 398)
                             
-                            val leftPoints = leftEyeIndices.map { idx ->
-                                val lm = face.get(idx)
-                                PointF(lm.x(), lm.y())
+                            val facePoints = face.map { lm ->
+                                com.eyecontrol.ai.helper.FaceLandmarkerHelper.transformLandmark(lm.x(), lm.y(), rotationDegrees, true)
                             }
-                            val rightPoints = rightEyeIndices.map { idx ->
-                                val lm = face.get(idx)
-                                PointF(lm.x(), lm.y())
-                            }
+                            val leftPoints = leftEyeIndices.map { idx -> facePoints[idx] }
+                            val rightPoints = rightEyeIndices.map { idx -> facePoints[idx] }
                             
                             _leftEyeLandmarks.value = leftPoints
                             _rightEyeLandmarks.value = rightPoints
-                            _allFaceLandmarks.value = face.map { lm ->
-                                PointF(lm.x(), lm.y())
-                            }
+                            _allFaceLandmarks.value = facePoints
                             
                             if (leftPoints.isNotEmpty() && rightPoints.isNotEmpty()) {
                                 _detectionStatus.value = "Eyes Detected"
