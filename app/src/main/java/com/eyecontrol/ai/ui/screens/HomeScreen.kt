@@ -33,7 +33,7 @@ import androidx.navigation.NavController
 import com.eyecontrol.ai.viewmodel.MainViewModel
 import androidx.camera.view.PreviewView
 import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalLifecycleOwner
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -209,7 +209,7 @@ fun HomeScreen(navController: NavController, viewModel: MainViewModel) {
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
-                            Icon(Icons.Default.VideocamOff, contentDescription = "Camera Off", modifier = Modifier.size(48.dp))
+                            Icon(Icons.Default.Warning, contentDescription = "Camera Off", modifier = Modifier.size(48.dp))
                             Spacer(modifier = Modifier.height(8.dp))
                             Text("Camera permission required", fontSize = 14.sp)
                             Spacer(modifier = Modifier.height(8.dp))
@@ -274,7 +274,7 @@ fun HomeScreen(navController: NavController, viewModel: MainViewModel) {
                                 )
                             ) {
                                 Icon(
-                                    if (isListening) Icons.Default.MicOff else Icons.Default.Mic,
+                                    imageVector = if (isListening) Icons.Default.Close else Icons.Default.PlayArrow,
                                     contentDescription = "Voice Input"
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
