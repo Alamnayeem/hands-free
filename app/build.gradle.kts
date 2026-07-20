@@ -81,31 +81,3 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
-
-tasks.register("downloadFaceLandmarkerTask") {
-    doLast {
-        val f = file("src/main/assets/face_landmarker.task")
-        if (!f.exists()) {
-            f.parentFile.mkdirs()
-            println("Downloading face_landmarker.task...")
-            val url = java.net.URL("https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task")
-            val connection = url.openConnection()
-            connection.connect()
-            val input = connection.getInputStream()
-            val output = java.io.FileOutputStream(f)
-            val buffer = ByteArray(4096)
-            var bytesRead = input.read(buffer)
-            while (bytesRead != -1) {
-                output.write(buffer, 0, bytesRead)
-                bytesRead = input.read(buffer)
-            }
-            output.close()
-            input.close()
-            println("Downloaded successfully!")
-        }
-    }
-}
-
-tasks.named("preBuild") {
-    dependsOn("downloadFaceLandmarkerTask")
-}

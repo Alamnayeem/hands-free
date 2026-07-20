@@ -10,6 +10,7 @@ import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.core.ImageProcessingOptions
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarker
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarkerResult
+import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -33,8 +34,22 @@ class FaceLandmarkerHelper(
 
     private fun setupFaceLandmarker() {
         try {
+            val modelFile = File(context.filesDir, "face_landmarker.task")
+            if (!modelFile.exists()) {
+                listener.onError("Downloading face model. Please wait...")
+                val success = ModelDownloader.downloadModel(
+                    context,
+                    "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+                    modelFile
+                )
+                if (!success) {
+                    listener.onError("Failed to download model file.")
+                    return
+                }
+            }
+
             val baseOptionsBuilder = BaseOptions.builder()
-                .setModelAssetPath("face_landmarker.task")
+                .setModelFilePath(modelFile.absolutePath)
 
             val optionsBuilder = FaceLandmarker.FaceLandmarkerOptions.builder()
                 .setBaseOptions(baseOptionsBuilder.build())
