@@ -34,6 +34,7 @@ import com.eyecontrol.ai.viewmodel.MainViewModel
 import androidx.camera.view.PreviewView
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import android.graphics.PointF
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -157,64 +158,244 @@ fun HomeScreen(navController: NavController, viewModel: MainViewModel) {
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp),
+                modifier = Modifier.fillMaxWidth(),
                 elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
             ) {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    if (hasCameraPermission) {
-                        AndroidView(
-                            factory = { ctx ->
-                                val previewView = PreviewView(ctx)
-                                val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
-                                cameraProviderFuture.addListener({
-                                    val cameraProvider = cameraProviderFuture.get()
-                                    val preview = androidx.camera.core.Preview.Builder().build().also {
-                                        it.setSurfaceProvider(previewView.surfaceProvider)
-                                    }
-                                    val cameraSelector = androidx.camera.core.CameraSelector.DEFAULT_FRONT_CAMERA
-                                    try {
-                                        cameraProvider.unbindAll()
-                                        cameraProvider.bindToLifecycle(
-                                            lifecycleOwner,
-                                            cameraSelector,
-                                            preview
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(240.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                    ) {
+                        if (hasCameraPermission) {
+                            val leftEyePoints by viewModel.leftEyeLandmarks.collectAsState()
+                            val rightEyePoints by viewModel.rightEyeLandmarks.collectAsState()
+                            val allFacePoints by viewModel.allFaceLandmarks.collectAsState()
+                            val isDetecting by viewModel.isDetecting.collectAsState()
+                            val detectionStatus by viewModel.detectionStatus.collectAsState()
+                            val fpsVal by viewModel.fps.collectAsState()
+
+                            AndroidView(
+                                factory = { ctx ->
+                                    val previewView = PreviewView(ctx)
+                                    val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
+                                    cameraProviderFuture.addListener({
+                                        val cameraProvider = cameraProviderFuture.get()
+                                        
+                                        val preview = androidx.camera.core.Preview.Builder().build().also {
+                                            it.setSurfaceProvider(previewView.surfaceProvider)
+                                        }
+
+                                        val imageAnalysis = androidx.camera.core.ImageAnalysis.Builder()
+                                            .setBackpressureStrategy(androidx.camera.core.ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                                            .build()
+
+                                        imageAnalysis.setAnalyzer(ContextCompat.getMainExecutor(ctx)) { imageProxy ->
+                                            viewModel.detectFrame(imageProxy)
+                                        }
+
+                                        val cameraSelector = androidx.camera.core.CameraSelector.DEFAULT_FRONT_CAMERA
+                                        try {
+                                            cameraProvider.unbindAll()
+                                            cameraProvider.bindToLifecycle(
+                                                lifecycleOwner,
+                                                cameraSelector,
+                                                preview,
+                                                imageAnalysis
+                                            )
+                                        } catch (exc: Exception) {
+                                            // Error binding CameraX
+                                        }
+                                    }, ContextCompat.getMainExecutor(ctx))
+                                    previewView
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            )
+
+                            // Canvas Overlay for Face and Eye Landmarks
+                            if (isDetecting) {
+                                androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+                                    val width = size.width
+                                    val height = size.height
+
+                                    // Draw face mesh landmarks in semi-transparent white
+                                    allFacePoints.forEach { point ->
+                                        // Mirror horizontally because front camera is mirrored in preview
+                                        val drawX = (1f - point.x) * width
+                                        val drawY = point.y * height
+                                        drawCircle(
+                                            color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.4f),
+                                            radius = 1.5.dp.toPx(),
+                                            center = androidx.compose.ui.geometry.Offset(drawX, drawY)
                                         )
-                                    } catch (exc: Exception) {
-                                        // Error binding CameraX
                                     }
-                                }, ContextCompat.getMainExecutor(ctx))
-                                previewView
-                            },
-                            modifier = Modifier.fillMaxSize()
-                        )
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(8.dp)
-                                .background(
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                                    RoundedCornerShape(4.dp)
-                                )
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text("FRONT CAM ACTIVE", color = MaterialTheme.colorScheme.onPrimary, fontSize = 10.sp)
+
+                                    // Draw Left Eye landmarks in glowing Cyan
+                                    leftEyePoints.forEach { point ->
+                                        val drawX = (1f - point.x) * width
+                                        val drawY = point.y * height
+                                        drawCircle(
+                                            color = androidx.compose.ui.graphics.Color.Cyan,
+                                            radius = 3.dp.toPx(),
+                                            center = androidx.compose.ui.geometry.Offset(drawX, drawY)
+                                        )
+                                    }
+
+                                    // Draw Right Eye landmarks in glowing Yellow
+                                    rightEyePoints.forEach { point ->
+                                        val drawX = (1f - point.x) * width
+                                        val drawY = point.y * height
+                                        drawCircle(
+                                            color = androidx.compose.ui.graphics.Color.Yellow,
+                                            radius = 3.dp.toPx(),
+                                            center = androidx.compose.ui.geometry.Offset(drawX, drawY)
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Camera Indicator Badge
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(8.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                                        RoundedCornerShape(4.dp)
+                                    )
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text("FRONT CAM ACTIVE", color = MaterialTheme.colorScheme.onPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            // FPS Counter Badge
+                            if (isDetecting && fpsVal > 0) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopStart)
+                                        .padding(8.dp)
+                                        .background(
+                                            MaterialTheme.colorScheme.tertiary.copy(alpha = 0.8f),
+                                            RoundedCornerShape(4.dp)
+                                        )
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text("FPS: $fpsVal", color = MaterialTheme.colorScheme.onTertiary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+
+                            // Overlay when detection is active but no face is found
+                            if (isDetecting && detectionStatus == "No face detected") {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.5f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Icon(
+                                            imageVector = Icons.Default.Face,
+                                            contentDescription = "No Face",
+                                            tint = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.8f),
+                                            modifier = Modifier.size(48.dp)
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            "No face detected",
+                                            color = androidx.compose.ui.graphics.Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 16.sp
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Icon(Icons.Default.Warning, contentDescription = "Camera Off", modifier = Modifier.size(48.dp))
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text("Camera permission required", fontSize = 14.sp)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Button(onClick = { cameraPermissionLauncher.launch(Manifest.permission.CAMERA) }) {
+                                    Text("Grant Permission")
+                                }
+                            }
                         }
-                    } else {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
+                    }
+
+                    if (hasCameraPermission) {
+                        val isDetecting by viewModel.isDetecting.collectAsState()
+                        val detectionStatus by viewModel.detectionStatus.collectAsState()
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.Warning, contentDescription = "Camera Off", modifier = Modifier.size(48.dp))
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text("Camera permission required", fontSize = 14.sp)
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Button(onClick = { cameraPermissionLauncher.launch(Manifest.permission.CAMERA) }) {
-                                Text("Grant Permission")
+                            Column {
+                                Text("Detection Status", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    val indicatorColor = when (detectionStatus) {
+                                        "Eyes Detected" -> androidx.compose.ui.graphics.Color(0xFF4CAF50) // Green
+                                        "Face Detected" -> androidx.compose.ui.graphics.Color(0xFFFF9800) // Orange
+                                        "No face detected" -> androidx.compose.ui.graphics.Color(0xFFF44336) // Red
+                                        else -> androidx.compose.ui.graphics.Color(0xFF2196F3) // Blue (Camera Ready)
+                                    }
+                                    
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .background(indicatorColor, RoundedCornerShape(50))
+                                    )
+                                    Text(
+                                        text = detectionStatus,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Button(
+                                    onClick = { viewModel.startDetection() },
+                                    enabled = !isDetecting,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.primary
+                                    ),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
+                                    Icon(Icons.Default.PlayArrow, contentDescription = "Start", modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Start", fontSize = 12.sp)
+                                }
+
+                                Button(
+                                    onClick = { viewModel.stopDetection() },
+                                    enabled = isDetecting,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.error
+                                    ),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
+                                    Icon(Icons.Default.Stop, contentDescription = "Stop", modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Stop", fontSize = 12.sp)
+                                }
                             }
                         }
                     }
