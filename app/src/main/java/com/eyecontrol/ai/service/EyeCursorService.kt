@@ -194,8 +194,7 @@ class EyeCursorService : Service() {
         setupFloatingCursor()
         setupFloatingPreview()
 
-        lifecycleOwner.onCreate()
-        lifecycleOwner.onStart()
+        lifecycleOwner.start()
 
         // Start listening to settings changes
         serviceScope.launch {
