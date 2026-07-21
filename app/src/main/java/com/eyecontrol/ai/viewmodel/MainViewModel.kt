@@ -29,6 +29,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val isCalibratedFlow: Flow<Boolean> = repository.isCalibratedFlow
     val calibrationDataFlow: Flow<SettingsRepository.CalibrationData> = repository.calibrationDataFlow
 
+    val dwellTimeFlow: Flow<Int> = repository.dwellTimeFlow
+    val blinkSensitivityFlow: Flow<Float> = repository.blinkSensitivityFlow
+    val scrollSpeedFlow: Flow<Float> = repository.scrollSpeedFlow
+    val dragSpeedFlow: Flow<Float> = repository.dragSpeedFlow
+    val clickDelayFlow: Flow<Int> = repository.clickDelayFlow
+    val enableBlinkClickFlow: Flow<Boolean> = repository.enableBlinkClickFlow
+    val enableDwellClickFlow: Flow<Boolean> = repository.enableDwellClickFlow
+
     private var faceLandmarkerHelper: FaceLandmarkerHelper? = null
 
     private val _isDetecting = MutableStateFlow(false)
@@ -128,6 +136,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             repository.resetSettings()
         }
+    }
+
+    fun setDwellTime(time: Int) {
+        viewModelScope.launch { repository.setDwellTime(time) }
+    }
+
+    fun setBlinkSensitivity(sensitivity: Float) {
+        viewModelScope.launch { repository.setBlinkSensitivity(sensitivity) }
+    }
+
+    fun setScrollSpeed(speed: Float) {
+        viewModelScope.launch { repository.setScrollSpeed(speed) }
+    }
+
+    fun setDragSpeed(speed: Float) {
+        viewModelScope.launch { repository.setDragSpeed(speed) }
+    }
+
+    fun setClickDelay(delay: Int) {
+        viewModelScope.launch { repository.setClickDelay(delay) }
+    }
+
+    fun setEnableBlinkClick(enabled: Boolean) {
+        viewModelScope.launch { repository.setEnableBlinkClick(enabled) }
+    }
+
+    fun setEnableDwellClick(enabled: Boolean) {
+        viewModelScope.launch { repository.setEnableDwellClick(enabled) }
     }
 
     fun startDetection() {

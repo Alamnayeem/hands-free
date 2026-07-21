@@ -46,6 +46,9 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
 import kotlin.math.abs
+import kotlin.math.sqrt
+import android.os.Vibrator
+import android.os.VibrationEffect
 
 class SimpleLifecycleOwner : LifecycleOwner {
     private val lifecycleRegistry = LifecycleRegistry(this)
@@ -178,6 +181,29 @@ class EyeCursorService : Service() {
     private val mainHandler = Handler(Looper.getMainLooper())
     private var floatingPreviewExpanded = true
 
+    // Premium settings
+    private var dwellTime = 1000
+    private var blinkSensitivity = 1.0f
+    private var scrollSpeed = 5.0f
+    private var dragSpeed = 5.0f
+    private var clickDelay = 300
+    private var enableBlinkClick = true
+    private var enableDwellClick = true
+
+    // Dwell and blink state tracking
+    private var stableDwellX = -1f
+    private var stableDwellY = -1f
+    private var dwellStartTime = 0L
+    private var hasTriggeredDwellClick = false
+
+    private var leftClosedTime = 0L
+    private var rightClosedTime = 0L
+    private var bothClosedTime = 0L
+    private var wasLeftClosed = false
+    private var wasRightClosed = false
+    private var wasBothClosed = false
+
+
     override fun onCreate() {
         super.onCreate()
         repository = SettingsRepository(this)
@@ -194,7 +220,8 @@ class EyeCursorService : Service() {
         setupFloatingCursor()
         setupFloatingPreview()
 
-        lifecycleOwner.start()
+        lifecycleOwner.onCreate()
+        lifecycleOwner.onStart()
 
         // Start listening to settings changes
         serviceScope.launch {
@@ -216,6 +243,27 @@ class EyeCursorService : Service() {
         }
         serviceScope.launch {
             repository.calibrationDataFlow.collectLatest { calibData = it }
+        }
+        serviceScope.launch {
+            repository.dwellTimeFlow.collectLatest { dwellTime = it }
+        }
+        serviceScope.launch {
+            repository.blinkSensitivityFlow.collectLatest { blinkSensitivity = it }
+        }
+        serviceScope.launch {
+            repository.scrollSpeedFlow.collectLatest { scrollSpeed = it }
+        }
+        serviceScope.launch {
+            repository.dragSpeedFlow.collectLatest { dragSpeed = it }
+        }
+        serviceScope.launch {
+            repository.clickDelayFlow.collectLatest { clickDelay = it }
+        }
+        serviceScope.launch {
+            repository.enableBlinkClickFlow.collectLatest { enableBlinkClick = it }
+        }
+        serviceScope.launch {
+            repository.enableDwellClickFlow.collectLatest { enableDwellClick = it }
         }
 
         // Setup MediaPipe and CameraX
@@ -254,7 +302,6 @@ class EyeCursorService : Service() {
             y = screenHeight / 2
         }
         windowManager?.addView(cursorView, cursorParams)
-        Log.d("CURSOR_DEBUG", "Cursor Added")
     }
 
     private fun setupFloatingPreview() {
@@ -429,6 +476,83 @@ class EyeCursorService : Service() {
                         val irisRightX = irisRight?.x ?: ((rightXmin + rightXmax) / 2f)
                         val irisRightY = irisRight?.y ?: ((rightYmin + rightYmax) / 2f)
 
+                        val leftWidth = abs(leftXmax - leftXmin)
+                        val leftHeight = abs(leftYmax - leftYmin)
+                        val leftEAR = if (leftWidth > 0f) leftHeight / leftWidth else 0f
+
+                        val rightWidth = abs(rightXmax - rightXmin)
+                        val rightHeight = abs(rightYmax - rightYmin)
+                        val rightEAR = if (rightWidth > 0f) rightHeight / rightWidth else 0f
+
+                        val threshold = 0.16f * blinkSensitivity
+                        val isLeftClosed = leftEAR < threshold
+                        val isRightClosed = rightEAR < threshold
+                        val now = SystemClock.uptimeMillis()
+
+                        if (enableBlinkClick) {
+                            if (isLeftClosed && isRightClosed) {
+                                if (!wasBothClosed) {
+                                    bothClosedTime = now
+                                    wasBothClosed = true
+                                }
+                                wasLeftClosed = false
+                                wasRightClosed = false
+                            } else if (isLeftClosed) {
+                                if (!wasLeftClosed && !wasBothClosed) {
+                                    leftClosedTime = now
+                                    wasLeftClosed = true
+                                }
+                                if (wasBothClosed) {
+                                    val duration = now - bothClosedTime
+                                    if (duration in 100..1000) {
+                                        EyeControlAccessibilityService.getInstance()?.performSystemAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME)
+                                    }
+                                    wasBothClosed = false
+                                }
+                                wasRightClosed = false
+                            } else if (isRightClosed) {
+                                if (!wasRightClosed && !wasBothClosed) {
+                                    rightClosedTime = now
+                                    wasRightClosed = true
+                                }
+                                if (wasBothClosed) {
+                                    val duration = now - bothClosedTime
+                                    if (duration in 100..1000) {
+                                        EyeControlAccessibilityService.getInstance()?.performSystemAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME)
+                                    }
+                                    wasBothClosed = false
+                                }
+                                wasLeftClosed = false
+                            } else {
+                                if (wasBothClosed) {
+                                    val duration = now - bothClosedTime
+                                    if (duration in 100..1000) {
+                                        EyeControlAccessibilityService.getInstance()?.performSystemAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME)
+                                    }
+                                    wasBothClosed = false
+                                }
+                                if (wasLeftClosed) {
+                                    val duration = now - leftClosedTime
+                                    if (duration in 100..1000) {
+                                        EyeControlAccessibilityService.getInstance()?.performSystemAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
+                                    }
+                                    wasLeftClosed = false
+                                }
+                                if (wasRightClosed) {
+                                    val duration = now - rightClosedTime
+                                    if (duration in 100..1000) {
+                                        val cx = lastX
+                                        val cy = lastY
+                                        if (cx >= 0 && cy >= 0) {
+                                            EyeControlAccessibilityService.getInstance()?.performClick(cx, cy)
+                                            vibrateFeedback()
+                                        }
+                                    }
+                                    wasRightClosed = false
+                                }
+                            }
+                        }
+
                         val leftXRatio = if (leftXmax - leftXmin > 0f) (irisLeftX - leftXmin) / (leftXmax - leftXmin) else 0.5f
                         val leftYRatio = if (leftYmax - leftYmin > 0f) (irisLeftY - leftYmin) / (leftYmax - leftYmin) else 0.5f
                         val rightXRatio = if (rightXmax - rightXmin > 0f) (irisRightX - rightXmin) / (rightXmax - rightXmin) else 0.5f
@@ -499,20 +623,59 @@ class EyeCursorService : Service() {
         val targetX = screenWidth / 2f + normX * (screenWidth / 2f)
         val targetY = screenHeight / 2f + normY * (screenHeight / 2f)
 
-        val alpha = 1.0f - (curSmoothing.coerceIn(0f, 1f) * 0.95f)
-
         val now = SystemClock.uptimeMillis()
         if (now - lastTrackingTimestamp > 1000 || lastX == -1f || lastY == -1f) {
             lastX = targetX
             lastY = targetY
         } else {
-            lastX = alpha * targetX + (1f - alpha) * lastX
-            lastY = alpha * targetY + (1f - alpha) * lastY
+            // Adaptive smoothing: If moving far, move fast (less smoothing). If micro-moving, apply high smoothing (anti-jitter)
+            val distance = sqrt((targetX - lastX) * (targetX - lastX) + (targetY - lastY) * (targetY - lastY))
+            
+            // Dead zone: if gaze shift is under 8 pixels, don't move at all to keep it completely stable
+            val adjustedTargetX = if (distance < 8f) lastX else targetX
+            val adjustedTargetY = if (distance < 8f) lastY else targetY
+            
+            val baseAlpha = 1.0f - (curSmoothing.coerceIn(0f, 1f) * 0.95f)
+            // If movement is large, scale up alpha (make it highly responsive)
+            val dynamicAlpha = if (distance > 100f) {
+                (baseAlpha * 2.0f).coerceAtMost(1.0f)
+            } else if (distance < 30f) {
+                // High smoothing for micro-movements
+                (baseAlpha * 0.4f).coerceAtLeast(0.01f)
+            } else {
+                baseAlpha
+            }
+
+            lastX = dynamicAlpha * adjustedTargetX + (1f - dynamicAlpha) * lastX
+            lastY = dynamicAlpha * adjustedTargetY + (1f - dynamicAlpha) * lastY
         }
         lastTrackingTimestamp = now
 
-        val finalX = lastX.coerceIn(curSize.toFloat(), (screenWidth - curSize).toFloat())
-val finalY = lastY.coerceIn(curSize.toFloat(), (screenHeight - curSize).toFloat())
+        val finalX = lastX.coerceIn(0f, screenWidth.toFloat())
+        val finalY = lastY.coerceIn(0f, screenHeight.toFloat())
+
+        // Dwell Click detection
+        if (enableDwellClick) {
+            val distThreshold = 30f // pixels
+            val distFromStable = sqrt((finalX - stableDwellX) * (finalX - stableDwellX) + (finalY - stableDwellY) * (finalY - stableDwellY))
+            
+            if (distFromStable < distThreshold) {
+                if (dwellStartTime == 0L) {
+                    dwellStartTime = now
+                    hasTriggeredDwellClick = false
+                } else if (!hasTriggeredDwellClick && (now - dwellStartTime >= dwellTime)) {
+                    // Trigger Click
+                    EyeControlAccessibilityService.getInstance()?.performClick(finalX, finalY)
+                    hasTriggeredDwellClick = true
+                    vibrateFeedback()
+                }
+            } else {
+                stableDwellX = finalX
+                stableDwellY = finalY
+                dwellStartTime = now
+                hasTriggeredDwellClick = false
+            }
+        }
 
         mainHandler.post {
             if (cursorView != null && windowManager != null) {
@@ -523,6 +686,17 @@ val finalY = lastY.coerceIn(curSize.toFloat(), (screenHeight - curSize).toFloat(
                 } catch (e: Exception) {}
             }
         }
+    }
+
+    private fun vibrateFeedback() {
+        try {
+            val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                vibrator.vibrate(50)
+            }
+        } catch (e: Exception) {}
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

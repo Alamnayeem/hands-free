@@ -24,6 +24,14 @@ class SettingsRepository(private val context: Context) {
         val CURSOR_SIZE = intPreferencesKey("cursor_size")
         val EYE_TRACKING_ACTIVE = booleanPreferencesKey("eye_tracking_active")
         
+        val DWELL_TIME = intPreferencesKey("dwell_time")
+        val BLINK_SENSITIVITY = floatPreferencesKey("blink_sensitivity")
+        val SCROLL_SPEED = floatPreferencesKey("scroll_speed")
+        val DRAG_SPEED = floatPreferencesKey("drag_speed")
+        val CLICK_DELAY = intPreferencesKey("click_delay")
+        val ENABLE_BLINK_CLICK = booleanPreferencesKey("enable_blink_click")
+        val ENABLE_DWELL_CLICK = booleanPreferencesKey("enable_dwell_click")
+
         val CALIB_CENTER_X = floatPreferencesKey("calib_center_x")
         val CALIB_CENTER_Y = floatPreferencesKey("calib_center_y")
         val CALIB_LEFT_X = floatPreferencesKey("calib_left_x")
@@ -72,6 +80,34 @@ class SettingsRepository(private val context: Context) {
 
     val eyeTrackingActiveFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[EYE_TRACKING_ACTIVE] ?: false
+    }
+
+    val dwellTimeFlow: Flow<Int> = context.dataStore.data.map { preferences ->
+        preferences[DWELL_TIME] ?: 1000
+    }
+
+    val blinkSensitivityFlow: Flow<Float> = context.dataStore.data.map { preferences ->
+        preferences[BLINK_SENSITIVITY] ?: 1.0f
+    }
+
+    val scrollSpeedFlow: Flow<Float> = context.dataStore.data.map { preferences ->
+        preferences[SCROLL_SPEED] ?: 5.0f
+    }
+
+    val dragSpeedFlow: Flow<Float> = context.dataStore.data.map { preferences ->
+        preferences[DRAG_SPEED] ?: 5.0f
+    }
+
+    val clickDelayFlow: Flow<Int> = context.dataStore.data.map { preferences ->
+        preferences[CLICK_DELAY] ?: 300
+    }
+
+    val enableBlinkClickFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[ENABLE_BLINK_CLICK] ?: true
+    }
+
+    val enableDwellClickFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[ENABLE_DWELL_CLICK] ?: true
     }
 
     val isCalibratedFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
@@ -133,6 +169,48 @@ class SettingsRepository(private val context: Context) {
     suspend fun setEyeTrackingActive(active: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[EYE_TRACKING_ACTIVE] = active
+        }
+    }
+
+    suspend fun setDwellTime(time: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[DWELL_TIME] = time
+        }
+    }
+
+    suspend fun setBlinkSensitivity(sensitivity: Float) {
+        context.dataStore.edit { preferences ->
+            preferences[BLINK_SENSITIVITY] = sensitivity
+        }
+    }
+
+    suspend fun setScrollSpeed(speed: Float) {
+        context.dataStore.edit { preferences ->
+            preferences[SCROLL_SPEED] = speed
+        }
+    }
+
+    suspend fun setDragSpeed(speed: Float) {
+        context.dataStore.edit { preferences ->
+            preferences[DRAG_SPEED] = speed
+        }
+    }
+
+    suspend fun setClickDelay(delay: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[CLICK_DELAY] = delay
+        }
+    }
+
+    suspend fun setEnableBlinkClick(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[ENABLE_BLINK_CLICK] = enabled
+        }
+    }
+
+    suspend fun setEnableDwellClick(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[ENABLE_DWELL_CLICK] = enabled
         }
     }
 

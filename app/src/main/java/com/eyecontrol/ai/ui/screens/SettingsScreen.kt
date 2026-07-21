@@ -30,6 +30,14 @@ fun SettingsScreen(navController: NavController, viewModel: MainViewModel) {
     val cursorSize by viewModel.cursorSizeFlow.collectAsState(initial = 40)
     val isCalibrated by viewModel.isCalibratedFlow.collectAsState(initial = false)
 
+    val dwellTime by viewModel.dwellTimeFlow.collectAsState(initial = 1000)
+    val blinkSensitivity by viewModel.blinkSensitivityFlow.collectAsState(initial = 1.0f)
+    val scrollSpeed by viewModel.scrollSpeedFlow.collectAsState(initial = 5.0f)
+    val dragSpeed by viewModel.dragSpeedFlow.collectAsState(initial = 5.0f)
+    val clickDelay by viewModel.clickDelayFlow.collectAsState(initial = 300)
+    val enableBlinkClick by viewModel.enableBlinkClickFlow.collectAsState(initial = true)
+    val enableDwellClick by viewModel.enableDwellClickFlow.collectAsState(initial = true)
+
     var showCameraDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
 
@@ -162,6 +170,103 @@ fun SettingsScreen(navController: NavController, viewModel: MainViewModel) {
                     value = cursorSize.toFloat(),
                     onValueChange = { viewModel.setCursorSize(it.toInt()) },
                     valueRange = 20f..100f,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            HorizontalDivider()
+
+            // Section: Hands-Free & Gestures
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Hands-Free & Gestures", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, fontSize = 14.sp)
+
+            // Dwell Click Enable Switch
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Dwell Click", fontSize = 16.sp)
+                    Text("Auto-trigger clicks when gaze is held still", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(
+                    checked = enableDwellClick,
+                    onCheckedChange = { viewModel.setEnableDwellClick(it) }
+                )
+            }
+
+            if (enableDwellClick) {
+                // Dwell Time Slider
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Dwell Time Delay", fontSize = 16.sp)
+                        Text("${dwellTime}ms", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                    Slider(
+                        value = dwellTime.toFloat(),
+                        onValueChange = { viewModel.setDwellTime(it.toInt()) },
+                        valueRange = 300f..2000f,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            HorizontalDivider()
+
+            // Blink Click Enable Switch
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Blink Actions", fontSize = 16.sp)
+                    Text("Trigger gestures via ocular blinks (Left = Back, Right = Click)", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(
+                    checked = enableBlinkClick,
+                    onCheckedChange = { viewModel.setEnableBlinkClick(it) }
+                )
+            }
+
+            if (enableBlinkClick) {
+                // Blink Sensitivity Slider
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Blink Threshold Multiplier", fontSize = 16.sp)
+                        Text(String.format("%.2f", blinkSensitivity), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                    Slider(
+                        value = blinkSensitivity,
+                        onValueChange = { viewModel.setBlinkSensitivity(it) },
+                        valueRange = 0.5f..2.0f,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            HorizontalDivider()
+
+            // Scroll Speed Slider
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("System Scroll Speed", fontSize = 16.sp)
+                    Text(String.format("%.1fx", scrollSpeed), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                }
+                Slider(
+                    value = scrollSpeed,
+                    onValueChange = { viewModel.setScrollSpeed(it) },
+                    valueRange = 1.0f..10.0f,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
