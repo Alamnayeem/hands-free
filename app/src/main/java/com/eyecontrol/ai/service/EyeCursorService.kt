@@ -254,6 +254,8 @@ class EyeCursorService : Service() {
             y = screenHeight / 2
         }
         windowManager?.addView(cursorView, cursorParams)
+        Log.d("CURSOR_DEBUG", "Cursor Added")
+cursorView?.setBackgroundColor(Color.GREEN)
     }
 
     private fun setupFloatingPreview() {
