@@ -510,8 +510,8 @@ class EyeCursorService : Service() {
         }
         lastTrackingTimestamp = now
 
-        val finalX = lastX.coerceIn(0f, screenWidth.toFloat())
-        val finalY = lastY.coerceIn(0f, screenHeight.toFloat())
+        val finalX = lastX.coerceIn(curSize.toFloat(), (screenWidth - curSize).toFloat())
+val finalY = lastY.coerceIn(curSize.toFloat(), (screenHeight - curSize).toFloat())
 
         mainHandler.post {
             if (cursorView != null && windowManager != null) {
