@@ -32,6 +32,23 @@ class SettingsRepository(private val context: Context) {
         val ENABLE_BLINK_CLICK = booleanPreferencesKey("enable_blink_click")
         val ENABLE_DWELL_CLICK = booleanPreferencesKey("enable_dwell_click")
 
+        // New properties
+        val CURSOR_COLOR = intPreferencesKey("cursor_color")
+        val DEAD_ZONE = intPreferencesKey("dead_zone")
+        val PRECISION_MODE = booleanPreferencesKey("precision_mode")
+        val TURBO_MODE = booleanPreferencesKey("turbo_mode")
+        val SNAP_DISTANCE = intPreferencesKey("snap_distance")
+        val BLINK_HOLD_TIME = intPreferencesKey("blink_hold_time")
+        val GESTURE_COOLDOWN = intPreferencesKey("gesture_cooldown")
+        val AUTO_RECENTER = booleanPreferencesKey("auto_recenter")
+        val EDGE_SCROLL = booleanPreferencesKey("edge_scroll")
+        val REEL_NAVIGATION = booleanPreferencesKey("reel_navigation")
+        val VOICE_COMMANDS = booleanPreferencesKey("voice_commands")
+        val PROGRESS_RING = booleanPreferencesKey("progress_ring")
+        val VIBRATION = booleanPreferencesKey("vibration")
+        val SOUND_FEEDBACK = booleanPreferencesKey("sound_feedback")
+        val SPEED_PROFILE = intPreferencesKey("speed_profile")
+
         val CALIB_CENTER_X = floatPreferencesKey("calib_center_x")
         val CALIB_CENTER_Y = floatPreferencesKey("calib_center_y")
         val CALIB_LEFT_X = floatPreferencesKey("calib_left_x")
@@ -108,6 +125,66 @@ class SettingsRepository(private val context: Context) {
 
     val enableDwellClickFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[ENABLE_DWELL_CLICK] ?: true
+    }
+
+    val cursorColorFlow: Flow<Int> = context.dataStore.data.map { preferences ->
+        preferences[CURSOR_COLOR] ?: 0xFFFF0000.toInt()
+    }
+
+    val deadZoneFlow: Flow<Int> = context.dataStore.data.map { preferences ->
+        preferences[DEAD_ZONE] ?: 10
+    }
+
+    val precisionModeFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[PRECISION_MODE] ?: true
+    }
+
+    val turboModeFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[TURBO_MODE] ?: true
+    }
+
+    val snapDistanceFlow: Flow<Int> = context.dataStore.data.map { preferences ->
+        preferences[SNAP_DISTANCE] ?: 80
+    }
+
+    val blinkHoldTimeFlow: Flow<Int> = context.dataStore.data.map { preferences ->
+        preferences[BLINK_HOLD_TIME] ?: 600
+    }
+
+    val gestureCooldownFlow: Flow<Int> = context.dataStore.data.map { preferences ->
+        preferences[GESTURE_COOLDOWN] ?: 800
+    }
+
+    val autoRecenterFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[AUTO_RECENTER] ?: true
+    }
+
+    val edgeScrollFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[EDGE_SCROLL] ?: true
+    }
+
+    val reelNavigationFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[REEL_NAVIGATION] ?: true
+    }
+
+    val voiceCommandsFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[VOICE_COMMANDS] ?: true
+    }
+
+    val progressRingFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[PROGRESS_RING] ?: true
+    }
+
+    val vibrationFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[VIBRATION] ?: true
+    }
+
+    val soundFeedbackFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[SOUND_FEEDBACK] ?: true
+    }
+
+    val speedProfileFlow: Flow<Int> = context.dataStore.data.map { preferences ->
+        preferences[SPEED_PROFILE] ?: 1
     }
 
     val isCalibratedFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
@@ -212,6 +289,52 @@ class SettingsRepository(private val context: Context) {
         context.dataStore.edit { preferences ->
             preferences[ENABLE_DWELL_CLICK] = enabled
         }
+    }
+
+    suspend fun setCursorColor(color: Int) {
+        context.dataStore.edit { preferences -> preferences[CURSOR_COLOR] = color }
+    }
+    suspend fun setDeadZone(zone: Int) {
+        context.dataStore.edit { preferences -> preferences[DEAD_ZONE] = zone }
+    }
+    suspend fun setPrecisionMode(enabled: Boolean) {
+        context.dataStore.edit { preferences -> preferences[PRECISION_MODE] = enabled }
+    }
+    suspend fun setTurboMode(enabled: Boolean) {
+        context.dataStore.edit { preferences -> preferences[TURBO_MODE] = enabled }
+    }
+    suspend fun setSnapDistance(distance: Int) {
+        context.dataStore.edit { preferences -> preferences[SNAP_DISTANCE] = distance }
+    }
+    suspend fun setBlinkHoldTime(time: Int) {
+        context.dataStore.edit { preferences -> preferences[BLINK_HOLD_TIME] = time }
+    }
+    suspend fun setGestureCooldown(cooldown: Int) {
+        context.dataStore.edit { preferences -> preferences[GESTURE_COOLDOWN] = cooldown }
+    }
+    suspend fun setAutoRecenter(enabled: Boolean) {
+        context.dataStore.edit { preferences -> preferences[AUTO_RECENTER] = enabled }
+    }
+    suspend fun setEdgeScroll(enabled: Boolean) {
+        context.dataStore.edit { preferences -> preferences[EDGE_SCROLL] = enabled }
+    }
+    suspend fun setReelNavigation(enabled: Boolean) {
+        context.dataStore.edit { preferences -> preferences[REEL_NAVIGATION] = enabled }
+    }
+    suspend fun setVoiceCommands(enabled: Boolean) {
+        context.dataStore.edit { preferences -> preferences[VOICE_COMMANDS] = enabled }
+    }
+    suspend fun setProgressRing(enabled: Boolean) {
+        context.dataStore.edit { preferences -> preferences[PROGRESS_RING] = enabled }
+    }
+    suspend fun setVibration(enabled: Boolean) {
+        context.dataStore.edit { preferences -> preferences[VIBRATION] = enabled }
+    }
+    suspend fun setSoundFeedback(enabled: Boolean) {
+        context.dataStore.edit { preferences -> preferences[SOUND_FEEDBACK] = enabled }
+    }
+    suspend fun setSpeedProfile(profile: Int) {
+        context.dataStore.edit { preferences -> preferences[SPEED_PROFILE] = profile }
     }
 
     suspend fun saveCalibration(

@@ -72,6 +72,15 @@ class EyeControlAccessibilityService : AccessibilityService() {
         dispatchGesture(gesture, null, null)
     }
 
+    fun performScroll(x: Float, y: Float, dx: Int, dy: Int) {
+        val path = Path()
+        path.moveTo(x, y)
+        path.lineTo(x + dx, y + dy)
+        val stroke = GestureDescription.StrokeDescription(path, 0L, 300L)
+        val gesture = GestureDescription.Builder().addStroke(stroke).build()
+        dispatchGesture(gesture, null, null)
+    }
+
     fun performSystemAction(actionId: Int) {
         performGlobalAction(actionId)
     }

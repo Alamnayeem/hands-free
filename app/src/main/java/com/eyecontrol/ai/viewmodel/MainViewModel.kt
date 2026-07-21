@@ -37,6 +37,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val enableBlinkClickFlow: Flow<Boolean> = repository.enableBlinkClickFlow
     val enableDwellClickFlow: Flow<Boolean> = repository.enableDwellClickFlow
 
+    val cursorColorFlow: Flow<Int> = repository.cursorColorFlow
+    val deadZoneFlow: Flow<Int> = repository.deadZoneFlow
+    val precisionModeFlow: Flow<Boolean> = repository.precisionModeFlow
+    val turboModeFlow: Flow<Boolean> = repository.turboModeFlow
+    val snapDistanceFlow: Flow<Int> = repository.snapDistanceFlow
+    val blinkHoldTimeFlow: Flow<Int> = repository.blinkHoldTimeFlow
+    val gestureCooldownFlow: Flow<Int> = repository.gestureCooldownFlow
+    val autoRecenterFlow: Flow<Boolean> = repository.autoRecenterFlow
+    val edgeScrollFlow: Flow<Boolean> = repository.edgeScrollFlow
+    val reelNavigationFlow: Flow<Boolean> = repository.reelNavigationFlow
+    val voiceCommandsFlow: Flow<Boolean> = repository.voiceCommandsFlow
+    val progressRingFlow: Flow<Boolean> = repository.progressRingFlow
+    val vibrationFlow: Flow<Boolean> = repository.vibrationFlow
+    val soundFeedbackFlow: Flow<Boolean> = repository.soundFeedbackFlow
+    val speedProfileFlow: Flow<Int> = repository.speedProfileFlow
+
     private var faceLandmarkerHelper: FaceLandmarkerHelper? = null
 
     private val _isDetecting = MutableStateFlow(false)
@@ -164,6 +180,52 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setEnableDwellClick(enabled: Boolean) {
         viewModelScope.launch { repository.setEnableDwellClick(enabled) }
+    }
+
+    fun setCursorColor(color: Int) {
+        viewModelScope.launch { repository.setCursorColor(color) }
+    }
+    fun setDeadZone(zone: Int) {
+        viewModelScope.launch { repository.setDeadZone(zone) }
+    }
+    fun setPrecisionMode(enabled: Boolean) {
+        viewModelScope.launch { repository.setPrecisionMode(enabled) }
+    }
+    fun setTurboMode(enabled: Boolean) {
+        viewModelScope.launch { repository.setTurboMode(enabled) }
+    }
+    fun setSnapDistance(distance: Int) {
+        viewModelScope.launch { repository.setSnapDistance(distance) }
+    }
+    fun setBlinkHoldTime(time: Int) {
+        viewModelScope.launch { repository.setBlinkHoldTime(time) }
+    }
+    fun setGestureCooldown(cooldown: Int) {
+        viewModelScope.launch { repository.setGestureCooldown(cooldown) }
+    }
+    fun setAutoRecenter(enabled: Boolean) {
+        viewModelScope.launch { repository.setAutoRecenter(enabled) }
+    }
+    fun setEdgeScroll(enabled: Boolean) {
+        viewModelScope.launch { repository.setEdgeScroll(enabled) }
+    }
+    fun setReelNavigation(enabled: Boolean) {
+        viewModelScope.launch { repository.setReelNavigation(enabled) }
+    }
+    fun setVoiceCommands(enabled: Boolean) {
+        viewModelScope.launch { repository.setVoiceCommands(enabled) }
+    }
+    fun setProgressRing(enabled: Boolean) {
+        viewModelScope.launch { repository.setProgressRing(enabled) }
+    }
+    fun setVibration(enabled: Boolean) {
+        viewModelScope.launch { repository.setVibration(enabled) }
+    }
+    fun setSoundFeedback(enabled: Boolean) {
+        viewModelScope.launch { repository.setSoundFeedback(enabled) }
+    }
+    fun setSpeedProfile(profile: Int) {
+        viewModelScope.launch { repository.setSpeedProfile(profile) }
     }
 
     fun startDetection() {
