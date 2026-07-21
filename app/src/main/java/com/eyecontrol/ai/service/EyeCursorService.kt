@@ -208,9 +208,71 @@ class FaceMeshOverlayView(context: Context) : View(context) {
     }
 }
 
+class LowPassFilter(private var alpha: Float) {
+    private var lastValue: Float? = null
+
+    fun filter(value: Float, alpha: Float): Float {
+        val lastVal = lastValue ?: run {
+            lastValue = value
+            return value
+        }
+        val result = alpha * value + (1f - alpha) * lastVal
+        lastValue = result
+        return result
+    }
+
+    fun lastValue(): Float? = lastValue
+    
+    fun reset() {
+        lastValue = null
+    }
+}
+
+class OneEuroFilter(
+    private val minCutoff: Float = 0.5f,
+    private val beta: Float = 0.02f,
+    private val dCutoff: Float = 1.0f
+) {
+    private val xFilter = LowPassFilter(1f)
+    private val dxFilter = LowPassFilter(1f)
+    private var lastTime: Long = 0L
+
+    fun filter(value: Float, timestamp: Long): Float {
+        if (lastTime == 0L) {
+            lastTime = timestamp
+            return xFilter.filter(value, 1f)
+        }
+        val dt = ((timestamp - lastTime).coerceAtLeast(1L)) / 1000f
+        lastTime = timestamp
+        if (dt <= 0f) {
+            return xFilter.lastValue() ?: value
+        }
+
+        val prevX = xFilter.lastValue() ?: value
+        val dx = (value - prevX) / dt
+        val alphaD = alpha(dt, dCutoff)
+        val edx = dxFilter.filter(dx, alphaD)
+        
+        val cutoff = minCutoff + beta * kotlin.math.abs(edx)
+        val alpha = alpha(dt, cutoff)
+        return xFilter.filter(value, alpha)
+    }
+
+    private fun alpha(dt: Float, cutoff: Float): Float {
+        val tau = 1f / (2f * kotlin.math.PI.toFloat() * cutoff)
+        return 1f / (1f + tau / dt)
+    }
+
+    fun reset() {
+        xFilter.reset()
+        dxFilter.reset()
+        lastTime = 0L
+    }
+}
+
 class KalmanFilter(
-    private var q: Float = 0.05f,
-    private var r: Float = 0.5f
+    private var q: Float = 0.03f,
+    private var r: Float = 0.6f
 ) {
     private var x: Float? = null
     private var p: Float = 1.0f
@@ -258,12 +320,12 @@ class VelocityTracker {
             lastTime = timestamp
             return
         }
-        val dt = (timestamp - lastTime) / 1000f
+        val dt = ((timestamp - lastTime).coerceAtLeast(1L)) / 1000f
         if (dt > 0.001f) {
             val instVx = (x - lastX) / dt
             val instVy = (y - lastY) / dt
             
-            val alpha = 0.3f
+            val alpha = 0.25f
             velocityX = alpha * instVx + (1f - alpha) * velocityX
             velocityY = alpha * instVy + (1f - alpha) * velocityY
             speed = kotlin.math.sqrt(velocityX * velocityX + velocityY * velocityY)
@@ -283,37 +345,32 @@ class VelocityTracker {
 }
 
 class AccelerationEngine {
-    private val thresholdLow = 100f
-    private val thresholdHigh = 800f
-
-    fun getAccelerationMultiplier(speed: Float): Float {
+    fun getAccelerationMultiplier(speed: Float, distance: Float): Float {
         return when {
-            speed < thresholdLow -> {
-                val ratio = speed / thresholdLow
-                0.4f + 0.6f * (ratio * ratio)
+            distance < 8f -> {
+                val ratio = distance / 8f
+                0.04f + 0.16f * (ratio * ratio)
             }
-            speed < thresholdHigh -> {
-                val ratio = (speed - thresholdLow) / (thresholdHigh - thresholdLow)
-                1.0f + 1.2f * ratio
+            distance < 45f -> {
+                val ratio = (distance - 8f) / 37f
+                0.2f + 0.8f * ratio
             }
             else -> {
-                val excess = (speed - thresholdHigh) / thresholdHigh
-                2.2f + 1.5f * (excess * excess).coerceAtMost(3.0f)
+                val ratio = ((distance - 45f) / 150f).coerceAtMost(2.5f)
+                1.0f + 1.6f * ratio
             }
         }
     }
 }
 
-class PredictionEngine(private val predictionSeconds: Float = 0.035f) {
-    fun predict(currentX: Float, currentY: Float, velocityX: Float, velocityY: Float, dt: Float): Pair<Float, Float> {
-        val speed = kotlin.math.sqrt(velocityX * velocityX + velocityY * velocityY)
-        val dynamicPredictionTime = if (speed > 1200f) {
-            predictionSeconds * 0.4f
-        } else {
-            predictionSeconds
+class PredictionEngine(private val basePredictionSeconds: Float = 0.025f) {
+    fun predict(currentX: Float, currentY: Float, velocityX: Float, velocityY: Float, speed: Float): Pair<Float, Float> {
+        if (speed < 50f) {
+            return Pair(currentX, currentY)
         }
-        val predX = currentX + velocityX * dynamicPredictionTime
-        val predY = currentY + velocityY * dynamicPredictionTime
+        val predFactor = (speed / 800f).coerceIn(0.1f, 1.0f) * basePredictionSeconds
+        val predX = currentX + velocityX * predFactor
+        val predY = currentY + velocityY * predFactor
         return Pair(predX, predY)
     }
 }
@@ -345,13 +402,15 @@ class MotionInterpolator {
     }
 }
 
-class DeadZoneProcessor(private val threshold: Float = 6f) {
-    fun process(targetX: Float, targetY: Float, lastX: Float, lastY: Float): Pair<Float, Float> {
+class DeadZoneProcessor {
+    fun process(targetX: Float, targetY: Float, lastX: Float, lastY: Float, deadZoneVal: Float): Pair<Float, Float> {
         if (lastX == -1f || lastY == -1f) return Pair(targetX, targetY)
         
         val dx = targetX - lastX
         val dy = targetY - lastY
         val distance = kotlin.math.sqrt(dx * dx + dy * dy)
+        
+        val threshold = if (distance < 15f) deadZoneVal else 1.0f
         
         if (distance < threshold) {
             return Pair(lastX, lastY)
@@ -418,7 +477,7 @@ class PrecisionController {
         val influenceRange = baseSnapDistance * 1.5f
         return if (minDistance < influenceRange) {
             val ratio = minDistance / influenceRange
-            0.5f + 0.5f * ratio
+            0.4f + 0.6f * ratio
         } else {
             1.0f
         }
@@ -426,27 +485,16 @@ class PrecisionController {
 }
 
 class EdgeClamp {
-    fun clamp(x: Float, y: Float, width: Float, height: Float, magneticWidth: Float = 40f): Pair<Float, Float> {
-        var clampedX = x
-        var clampedY = y
-        
-        if (clampedX < magneticWidth) {
-            clampedX = magneticWidth + (clampedX - magneticWidth) * 0.3f
-        } else if (clampedX > width - magneticWidth) {
-            clampedX = (width - magneticWidth) + (clampedX - (width - magneticWidth)) * 0.3f
-        }
-        
-        if (clampedY < magneticWidth) {
-            clampedY = magneticWidth + (clampedY - magneticWidth) * 0.3f
-        } else if (clampedY > height - magneticWidth) {
-            clampedY = (height - magneticWidth) + (clampedY - (height - magneticWidth)) * 0.3f
-        }
-        
-        return Pair(clampedX.coerceIn(0f, width), clampedY.coerceIn(0f, height))
+    fun clamp(x: Float, y: Float, width: Float, height: Float, margin: Float = 5f): Pair<Float, Float> {
+        val clampedX = x.coerceIn(margin, width - margin)
+        val clampedY = y.coerceIn(margin, height - margin)
+        return Pair(clampedX, clampedY)
     }
 }
 
 class CursorEngine {
+    private val oneEuroX = OneEuroFilter()
+    private val oneEuroY = OneEuroFilter()
     private val kalmanX = KalmanFilter()
     private val kalmanY = KalmanFilter()
     private val velocityTracker = VelocityTracker()
@@ -455,6 +503,7 @@ class CursorEngine {
     private val motionInterpolator = MotionInterpolator()
     private val edgeClamp = EdgeClamp()
     private val precisionController = PrecisionController()
+    private val deadZoneProcessor = DeadZoneProcessor()
     
     private var lastX = -1f
     private var lastY = -1f
@@ -475,10 +524,16 @@ class CursorEngine {
         accessibilityService: android.accessibilityservice.AccessibilityService?,
         now: Long
     ): Pair<Float, Float> {
+        if (confidence < 0.5f) {
+            return Pair(if (lastX == -1f) screenWidth / 2f else lastX, if (lastY == -1f) screenHeight / 2f else lastY)
+        }
+
         if (lastTime == 0L || lastX == -1f || lastY == -1f) {
             lastX = rawTargetX
             lastY = rawTargetY
             lastTime = now
+            oneEuroX.reset()
+            oneEuroY.reset()
             kalmanX.reset()
             kalmanY.reset()
             velocityTracker.reset()
@@ -489,37 +544,36 @@ class CursorEngine {
         val dt = ((now - lastTime).coerceAtLeast(1L)) / 1000f
         lastTime = now
 
-        if (confidence <= 0.1f) {
+        val oX = oneEuroX.filter(rawTargetX, now)
+        val oY = oneEuroY.filter(rawTargetY, now)
+
+        val kX = kalmanX.update(oX)
+        val kY = kalmanY.update(oY)
+
+        val dxRaw = kX - lastX
+        val dyRaw = kY - lastY
+        val distRaw = kotlin.math.sqrt(dxRaw * dxRaw + dyRaw * dyRaw)
+
+        val actualDeadZone = deadZoneVal.toFloat().coerceAtLeast(1.5f)
+        val (dzX, dzY) = deadZoneProcessor.process(kX, kY, lastX, lastY, actualDeadZone)
+
+        if (dzX == lastX && dzY == lastY) {
+            velocityTracker.reset()
             return Pair(lastX, lastY)
         }
 
-        val distToTarget = kotlin.math.sqrt((rawTargetX - lastX) * (rawTargetX - lastX) + (rawTargetY - lastY) * (rawTargetY - lastY))
-        
-        val baseQ = 0.08f
-        val baseR = 0.8f
-        
-        val adaptiveQ = if (distToTarget > 150f) baseQ * 3.0f else if (distToTarget < 30f) baseQ * 0.3f else baseQ
-        val adaptiveR = if (distToTarget > 150f) baseR * 0.1f else if (distToTarget < 30f) baseR * 4.0f else baseR
-
-        val kX = kalmanX.update(rawTargetX, adaptiveQ, adaptiveR)
-        val kY = kalmanY.update(rawTargetY, adaptiveQ, adaptiveR)
-
-        velocityTracker.addMovement(kX, kY, now)
+        velocityTracker.addMovement(dzX, dzY, now)
         val velocityX = velocityTracker.velocityX
         val velocityY = velocityTracker.velocityY
         val currentSpeed = velocityTracker.speed
 
-        val deadZoneProcessor = DeadZoneProcessor(deadZoneVal.toFloat())
-        val (dzX, dzY) = deadZoneProcessor.process(kX, kY, lastX, lastY)
-
         var speedMultiplier = curSpeed
-        
         when (speedProfile) {
-            0 -> speedMultiplier *= 0.6f
-            2 -> speedMultiplier *= 1.4f
+            0 -> speedMultiplier *= 0.5f
+            2 -> speedMultiplier *= 1.5f
         }
 
-        val accelMultiplier = accelerationEngine.getAccelerationMultiplier(currentSpeed)
+        val accelMultiplier = accelerationEngine.getAccelerationMultiplier(currentSpeed, distRaw)
         speedMultiplier *= accelMultiplier
 
         precisionController.updateClickableRegions(accessibilityService, now)
@@ -528,26 +582,24 @@ class CursorEngine {
             speedMultiplier *= precisionModifier
         }
 
-        speedMultiplier *= confidence
-
-        val dx = dzX - lastX
-        val dy = dzY - lastY
+        val dxFiltered = dzX - lastX
+        val dyFiltered = dzY - lastY
         
-        var finalTargetX = lastX + dx * speedMultiplier
-        var finalTargetY = lastY + dy * speedMultiplier
+        var finalTargetX = lastX + dxFiltered * speedMultiplier
+        var finalTargetY = lastY + dyFiltered * speedMultiplier
 
-        if (currentSpeed > 50f) {
-            val (predX, predY) = predictionEngine.predict(finalTargetX, finalTargetY, velocityX, velocityY, dt)
-            val mix = (currentSpeed / 600f).coerceIn(0f, 0.7f)
+        if (currentSpeed > 60f) {
+            val (predX, predY) = predictionEngine.predict(finalTargetX, finalTargetY, velocityX, velocityY, currentSpeed)
+            val mix = (currentSpeed / 1000f).coerceIn(0f, 0.6f)
             finalTargetX = (1f - mix) * finalTargetX + mix * predX
             finalTargetY = (1f - mix) * finalTargetY + mix * predY
         }
 
-        val baseResponsiveness = 12f
-        val adaptiveResponsiveness = if (currentSpeed < 30f) {
-            5f
-        } else if (distToTarget > 200f && enableTurboMode) {
-            20f
+        val baseResponsiveness = 10f
+        val adaptiveResponsiveness = if (currentSpeed < 40f) {
+            4f
+        } else if (distRaw > 200f && enableTurboMode) {
+            18f
         } else {
             baseResponsiveness
         }
@@ -570,6 +622,8 @@ class CursorEngine {
     fun recenter(centerX: Float, centerY: Float) {
         lastX = centerX
         lastY = centerY
+        oneEuroX.reset()
+        oneEuroY.reset()
         kalmanX.reset()
         kalmanY.reset()
         velocityTracker.reset()
@@ -580,6 +634,8 @@ class CursorEngine {
         lastX = -1f
         lastY = -1f
         lastTime = 0L
+        oneEuroX.reset()
+        oneEuroY.reset()
         kalmanX.reset()
         kalmanY.reset()
         velocityTracker.reset()
@@ -680,6 +736,9 @@ class EyeCursorService : Service() {
     private var wasLeftClosed = false
     private var wasRightClosed = false
     private var wasBothClosed = false
+    private var hasBothTriggered = false
+    private var stationaryStartTime = 0L
+    private var lastClickTime = 0L
 
 
     override fun onCreate() {
@@ -1035,68 +1094,50 @@ class EyeCursorService : Service() {
 
                         if (enableBlinkClick && (now - lastGestureTime >= gestureCooldown)) {
                             if (isLeftClosed && isRightClosed) {
-                                if (!wasBothClosed) {
+                                if (bothClosedTime == 0L) {
                                     bothClosedTime = now
-                                    wasBothClosed = true
+                                    hasBothTriggered = false
                                 }
-                                wasLeftClosed = false
-                                wasRightClosed = false
+                                if (!hasBothTriggered && (now - bothClosedTime >= 2000L)) {
+                                    hasBothTriggered = true
+                                    EyeControlAccessibilityService.getInstance()?.performSystemAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME)
+                                    lastGestureTime = now
+                                    vibrateFeedback()
+                                    speakFeedback("Home")
+                                }
+                                leftClosedTime = 0L
+                                rightClosedTime = 0L
                             } else if (isLeftClosed) {
-                                if (!wasLeftClosed && !wasBothClosed) {
+                                if (leftClosedTime == 0L && bothClosedTime == 0L) {
                                     leftClosedTime = now
-                                    wasLeftClosed = true
                                 }
-                                if (wasBothClosed) {
-                                    val duration = now - bothClosedTime
-                                    if (duration in 200..1200) {
-                                        EyeControlAccessibilityService.getInstance()?.performSystemAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME)
-                                        lastGestureTime = now
-                                        vibrateFeedback()
-                                        speakFeedback("Home")
-                                    }
-                                    wasBothClosed = false
-                                }
-                                wasRightClosed = false
+                                bothClosedTime = 0L
+                                rightClosedTime = 0L
                             } else if (isRightClosed) {
-                                if (!wasRightClosed && !wasBothClosed) {
+                                if (rightClosedTime == 0L && bothClosedTime == 0L) {
                                     rightClosedTime = now
-                                    wasRightClosed = true
                                 }
-                                if (wasBothClosed) {
-                                    val duration = now - bothClosedTime
-                                    if (duration in 200..1200) {
-                                        EyeControlAccessibilityService.getInstance()?.performSystemAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME)
-                                        lastGestureTime = now
-                                        vibrateFeedback()
-                                        speakFeedback("Home")
-                                    }
-                                    wasBothClosed = false
-                                }
-                                wasLeftClosed = false
+                                bothClosedTime = 0L
+                                leftClosedTime = 0L
                             } else {
-                                if (wasBothClosed) {
-                                    val duration = now - bothClosedTime
-                                    if (duration in 200..1200) {
-                                        EyeControlAccessibilityService.getInstance()?.performSystemAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME)
-                                        lastGestureTime = now
-                                        vibrateFeedback()
-                                        speakFeedback("Home")
-                                    }
-                                    wasBothClosed = false
+                                if (bothClosedTime > 0L) {
+                                    bothClosedTime = 0L
+                                    hasBothTriggered = false
                                 }
-                                if (wasLeftClosed) {
+                                if (leftClosedTime > 0L) {
                                     val duration = now - leftClosedTime
-                                    if (duration in 200..1200) {
+                                    leftClosedTime = 0L
+                                    if (duration in 700..900) {
                                         EyeControlAccessibilityService.getInstance()?.performSystemAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
                                         lastGestureTime = now
                                         vibrateFeedback()
                                         speakFeedback("Back")
                                     }
-                                    wasLeftClosed = false
                                 }
-                                if (wasRightClosed) {
+                                if (rightClosedTime > 0L) {
                                     val duration = now - rightClosedTime
-                                    if (duration in 200..1200) {
+                                    rightClosedTime = 0L
+                                    if (duration in 700..900) {
                                         val cx = lastX
                                         val cy = lastY
                                         if (cx >= 0 && cy >= 0) {
@@ -1107,9 +1148,17 @@ class EyeCursorService : Service() {
                                             speakFeedback("Click")
                                         }
                                     }
-                                    wasRightClosed = false
                                 }
+                                bothClosedTime = 0L
+                                leftClosedTime = 0L
+                                rightClosedTime = 0L
+                                hasBothTriggered = false
                             }
+                        } else {
+                            bothClosedTime = 0L
+                            leftClosedTime = 0L
+                            rightClosedTime = 0L
+                            hasBothTriggered = false
                         }
 
                         val leftXRatio = if (leftXmax - leftXmin > 0f) (irisLeftX - leftXmin) / (leftXmax - leftXmin) else 0.5f
@@ -1154,6 +1203,17 @@ class EyeCursorService : Service() {
 
     private fun updateCursorPosition(xRatio: Float, yRatio: Float) {
         if (isCursorPaused) return
+        if (!isFaceDetected.value) {
+            stableDwellX = -1f
+            stableDwellY = -1f
+            stationaryStartTime = 0L
+            dwellStartTime = 0L
+            hasTriggeredDwellClick = false
+            mainHandler.post {
+                cursorView?.dwellProgress = 0f
+            }
+            return
+        }
 
         val calib = calibData ?: return
         if (!calib.isCalibrated) return
@@ -1235,41 +1295,71 @@ class EyeCursorService : Service() {
 
         // Dwell Click detection
         if (enableDwellClick) {
-            val distThreshold = 35f // pixels
-            val distFromStable = sqrt((finalX - stableDwellX) * (finalX - stableDwellX) + (finalY - stableDwellY) * (finalY - stableDwellY))
-            
-            if (distFromStable < distThreshold) {
-                if (dwellStartTime == 0L) {
-                    dwellStartTime = now
-                    hasTriggeredDwellClick = false
-                } else if (!hasTriggeredDwellClick) {
-                    val elapsed = now - dwellStartTime
-                    val progress = (elapsed.toFloat() / dwellTime.toFloat()).coerceIn(0f, 1f)
-                    
-                    mainHandler.post {
-                        cursorView?.dwellProgress = progress
-                        cursorView?.showProgressRing = enableProgressRing
-                    }
-
-                    if (elapsed >= dwellTime) {
-                        // Trigger Click!
-                        accessibilityService?.performClick(finalX, finalY)
-                        hasTriggeredDwellClick = true
-                        vibrateFeedback()
-                        triggerRippleEffect()
-                        speakFeedback("Selected")
-                        mainHandler.post {
-                            cursorView?.dwellProgress = 0f
-                        }
-                    }
-                }
-            } else {
+            if (now - lastClickTime < 1500L) {
                 stableDwellX = finalX
                 stableDwellY = finalY
-                dwellStartTime = now
+                stationaryStartTime = 0L
+                dwellStartTime = 0L
                 hasTriggeredDwellClick = false
                 mainHandler.post {
                     cursorView?.dwellProgress = 0f
+                }
+            } else {
+                if (stableDwellX == -1f || stableDwellY == -1f) {
+                    stableDwellX = finalX
+                    stableDwellY = finalY
+                    stationaryStartTime = now
+                    dwellStartTime = 0L
+                    hasTriggeredDwellClick = false
+                }
+
+                val distFromStable = sqrt((finalX - stableDwellX) * (finalX - stableDwellX) + (finalY - stableDwellY) * (finalY - stableDwellY))
+
+                if (distFromStable < 3f) {
+                    if (stationaryStartTime == 0L) {
+                        stationaryStartTime = now
+                    } else {
+                        val stationaryElapsed = now - stationaryStartTime
+                        if (stationaryElapsed >= 300L) {
+                            if (dwellStartTime == 0L) {
+                                dwellStartTime = now
+                                hasTriggeredDwellClick = false
+                            } else if (!hasTriggeredDwellClick) {
+                                val elapsed = now - dwellStartTime
+                                val progress = (elapsed.toFloat() / dwellTime.toFloat()).coerceIn(0f, 1f)
+                                
+                                mainHandler.post {
+                                    cursorView?.dwellProgress = progress
+                                    cursorView?.showProgressRing = enableProgressRing
+                                }
+
+                                if (elapsed >= dwellTime) {
+                                    accessibilityService?.performClick(finalX, finalY)
+                                    hasTriggeredDwellClick = true
+                                    lastClickTime = now
+                                    vibrateFeedback()
+                                    triggerRippleEffect()
+                                    speakFeedback("Selected")
+                                    mainHandler.post {
+                                        cursorView?.dwellProgress = 0f
+                                    }
+                                }
+                            }
+                        } else {
+                            mainHandler.post {
+                                cursorView?.dwellProgress = 0f
+                            }
+                        }
+                    }
+                } else {
+                    stableDwellX = finalX
+                    stableDwellY = finalY
+                    stationaryStartTime = now
+                    dwellStartTime = 0L
+                    hasTriggeredDwellClick = false
+                    mainHandler.post {
+                        cursorView?.dwellProgress = 0f
+                    }
                 }
             }
         } else {
